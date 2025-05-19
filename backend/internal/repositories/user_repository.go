@@ -2,40 +2,37 @@ package repositories
 
 import (
 	"card-system/backend/internal/models"
+	"context"
+	"errors"
 
 	"gorm.io/gorm"
 )
 
-// UserRepository 用户仓储接口
+// UserRepository 定义用户仓库接口
 type UserRepository interface {
-	Create(user *models.User) error
-	GetByUsername(username string) (*models.User, error)
-	GetByEmail(email string) (*models.User, error)
-	GetByPhone(phone string) (*models.User, error)
-	GetByID(id uint) (*models.User, error)
-	Update(user *models.User) error
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	// 其他接口方法...
 }
 
-// UserRepositoryImpl 用户仓储实现
+// UserRepositoryImpl 实现 UserRepository 接口
 type UserRepositoryImpl struct {
-	*BaseRepository
+	db *gorm.DB
 }
 
-// NewUserRepository 创建用户仓储实例
+// NewUserRepository 创建用户仓库实例
 func NewUserRepository(db *gorm.DB) UserRepository {
-	return &UserRepositoryImpl{NewBaseRepository(db)}
+	return &UserRepositoryImpl{db: db}
 }
 
-// Create 创建用户
-func (r *UserRepositoryImpl) Create(user *models.User) error {
-	return r.db.Create(user).Error
-}
-
-// GetByUsername 根据用户名查询用户
-func (r *UserRepositoryImpl) GetByUsername(username string) (*models.User, error) {
+// GetByEmail 根据邮箱查找用户
+func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("username = ?", username).First(&user).Error
-	return &user, err
+	result := r.db.WithContext(ctx).Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, nil // 返回nil表示用户不存在
+		}
+		return nil, result.Error
+	}
+	return &user, nil
 }
-
-// 其他方法类似实现...

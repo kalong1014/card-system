@@ -1,68 +1,57 @@
 package database
 
 import (
+	"card-system/backend/utils"
 	"context"
 	"fmt"
-	"time"
-
-	"card-system/backend/internal/config"
-	"card-system/backend/pkg/logger"
 
 	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
-// ConnectDB 连接MySQL数据库
-func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
-	// 构建DSN
+var (
+	DB    *gorm.DB
+	Redis *redis.Client
+)
+
+// InitDB 初始化数据库连接
+func InitDB() error {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
+		"your_username",
+		"your_password",
+		"your_host",
+		"your_port",
+		"your_dbname",
+	)
 
-	// 连接数据库
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	var err error
+	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		logger.Errorf("连接数据库失败: %v", err)
-		return nil, err
+		utils.Log.Fatal("Failed to connect database: %v", err)
+		return err
 	}
 
-	// 获取底层SQL连接
-	sqlDB, err := db.DB()
-	if err != nil {
-		logger.Errorf("获取数据库连接失败: %v", err)
-		return nil, err
-	}
-
-	// 配置连接池
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Minute * 30)
-
-	// 测试连接
-	if err := sqlDB.Ping(); err != nil {
-		logger.Errorf("测试数据库连接失败: %v", err)
-		return nil, err
-	}
-
-	logger.Info("数据库连接成功")
-	return db, nil
+	utils.Log.Info("Database connected successfully")
+	return nil // 添加缺失的返回语句
 }
 
-// ConnectRedis 连接Redis
-func ConnectRedis(cfg *config.Config) *redis.Client {
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisHost + ":" + cfg.RedisPort,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
+// InitRedis 初始化Redis连接
+func InitRedis() error {
+	Redis = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
 	})
 
-	// 测试连接
+	// 修正：使用Redis包的上下文
 	ctx := context.Background()
-	_, err := client.Ping(ctx).Result()
+	_, err := Redis.Ping(ctx).Result()
 	if err != nil {
-		logger.Fatalf("连接Redis失败: %v", err)
+		utils.Log.Fatal("Failed to connect redis: %v", err)
+		return err
 	}
 
-	logger.Info("Redis连接成功")
-	return client
+	utils.Log.Info("Redis connected successfully")
+	return nil
 }

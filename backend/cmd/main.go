@@ -1,60 +1,39 @@
 package main
 
 import (
-	"card-system/backend/internal/config"
 	"card-system/backend/internal/database"
+	"card-system/backend/internal/repositories"
 	"card-system/backend/internal/router"
-	"card-system/backend/pkg/logger"
-	"context"
-	"fmt"
+	"card-system/backend/internal/services"
+	"card-system/backend/utils"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 func main() {
-	cfg, err := config.LoadConfig(".")
-	if err != nil {
-		logger.Fatal("配置加载失败", zap.Error(err))
+	// 初始化数据库连接
+	if err := database.InitDB(); err != nil {
+		utils.Log.Fatal("Failed to initialize database: %v", err)
 	}
 
-	db, err := database.ConnectDB(cfg)
-	if err != nil {
-		logger.Fatal("数据库连接失败", zap.Error(err))
+	// 初始化Redis连接
+	if err := database.InitRedis(); err != nil {
+		utils.Log.Fatal("Failed to initialize redis: %v", err)
 	}
 
-	redisClient := database.ConnectRedis(cfg)
-	defer redisClient.Close()
+	// 创建仓库实例
+	userRepo := repositories.NewUserRepository(database.DB)
+	cardRepo := repositories.NewCardSecretRepository(database.DB)
 
-	r := gin.New()
-	router.SetupRouter(r, db, redisClient)
+	// 创建服务实例
+	userService := services.NewUserService(userRepo)
+	cardService := services.NewCardSecretService(cardRepo)
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", cfg.ServerPort),
-		Handler: r,
+	// 设置路由
+	r := router.SetupRouter(userService, cardService)
+
+	// 启动服务器
+	utils.Log.Info("Server started on port :8080")
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		utils.Log.Fatal("Server failed to start: %v", err)
 	}
-
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("服务器启动失败", zap.Error(err))
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		logger.Fatal("服务器关闭失败", zap.Error(err))
-	}
-
-	logger.Info("服务器已优雅关闭")
 }

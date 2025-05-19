@@ -1,133 +1,72 @@
 package services
 
 import (
+	"context"
+	"errors"
+	"math/rand"
+	"time"
+
 	"card-system/backend/internal/models"
 	"card-system/backend/internal/repositories"
-	"card-system/backend/pkg/logger"
-	"context"
-	"fmt"
-	"math/rand"
-	"strings"
-	"time"
 )
 
 // CardSecretService 卡密服务接口
 type CardSecretService interface {
-	GenerateCardSecrets(ctx context.Context, productID, merchantID uint, count, length int) ([]*models.CardSecret, error)
+	GenerateCardSecrets(ctx context.Context, merchantID uint, productID uint, count int, expireDays int) ([]*models.CardSecret, error)
 	GetCardSecretsByProduct(ctx context.Context, productID uint) ([]*models.CardSecret, error)
-	GetCardSecretByID(ctx context.Context, id uint) (*models.CardSecret, error)
-	UpdateCardSecret(ctx context.Context, cardSecret *models.CardSecret) error
-	UseCardSecret(ctx context.Context, secret string, orderID uint, usedBy string) (*models.CardSecret, error)
+	// 其他方法...
 }
 
 // CardSecretServiceImpl 卡密服务实现
 type CardSecretServiceImpl struct {
-	cardSecretRepo repositories.CardSecretRepository
-	productRepo    repositories.ProductRepository
+	cardRepo repositories.CardSecretRepository
 }
 
-// NewCardSecretService 创建卡密服务
-func NewCardSecretService(cardSecretRepo repositories.CardSecretRepository, productRepo repositories.ProductRepository) CardSecretService {
-	return &CardSecretServiceImpl{
-		cardSecretRepo: cardSecretRepo,
-		productRepo:    productRepo,
-	}
+// NewCardSecretService 创建卡密服务实例
+func NewCardSecretService(repo repositories.CardSecretRepository) CardSecretService {
+	return &CardSecretServiceImpl{cardRepo: repo}
 }
 
 // GenerateCardSecrets 生成卡密
-func (s *CardSecretServiceImpl) GenerateCardSecrets(ctx context.Context, productID, merchantID uint, count int, length int) ([]*models.CardSecret, error) {
-	// 检查商品是否存在
-	product, err := s.productRepo.GetByID(ctx, productID)
-	if err != nil {
-		return nil, fmt.Errorf("商品不存在: %v", err)
+func (s *CardSecretServiceImpl) GenerateCardSecrets(ctx context.Context, merchantID uint, productID uint, count int, expireDays int) ([]*models.CardSecret, error) {
+	if count <= 0 || count > 1000 {
+		return nil, errors.New("生成数量必须在1-1000之间")
 	}
 
-	if product.MerchantID != merchantID {
-		return nil, fmt.Errorf("无权限为该商品生成卡密")
-	}
-
-	// 生成卡密
-	cardSecrets := make([]*models.CardSecret, count)
-	now := time.Now()
-
+	var cardSecrets []*models.CardSecret
 	for i := 0; i < count; i++ {
-		secret := s.generateRandomSecret(length)
-		cardSecrets[i] = &models.CardSecret{
-			Secret:     secret,
-			ProductID:  productID,
-			Status:     0, // 未使用
+		card := &models.CardSecret{
 			MerchantID: merchantID,
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			ProductID:  productID,
+			Code:       generateRandomCode(16),
+			Status:     0, // 修正：使用数字0表示未使用状态
+			ExpiresAt:  time.Now().AddDate(0, 0, expireDays),
+			CreatedAt:  time.Now(),
 		}
+		cardSecrets = append(cardSecrets, card)
 	}
 
-	// 保存卡密
-	return cardSecrets, nil
-	}
-
-	// 更新商品库存
-	product.Stock += count
-	err = s.productRepo.Update(ctx, product)
+	err := s.cardRepo.BatchCreate(ctx, cardSecrets)
 	if err != nil {
-		logger.Errorf("更新商品库存失败: %v", err)
-		// 这里可以考虑添加事务回滚逻辑
+		return nil, err
 	}
 
 	return cardSecrets, nil
 }
 
-// GetCardSecretsByProduct 获取商品的卡密列表
+// GetCardSecretsByProduct 获取产品相关卡密
 func (s *CardSecretServiceImpl) GetCardSecretsByProduct(ctx context.Context, productID uint) ([]*models.CardSecret, error) {
-	return s.cardSecretRepo.GetByProductID(ctx, productID)
+	return s.cardRepo.GetByProduct(ctx, productID)
 }
 
-// GetCardSecretByID 获取卡密详情
-func (s *CardSecretServiceImpl) GetCardSecretByID(ctx context.Context, id uint) (*models.CardSecret, error) {
-	return s.cardSecretRepo.GetByID(ctx, id)
-}
-
-// UpdateCardSecret 更新卡密信息
-func (s *CardSecretServiceImpl) UpdateCardSecret(ctx context.Context, cardSecret *models.CardSecret) error {
-	return s.cardSecretRepo.Update(ctx, cardSecret)
-}
-
-// UseCardSecret 使用卡密
-func (s *CardSecretServiceImpl) UseCardSecret(ctx context.Context, secret string, orderID uint, usedBy string) (*models.CardSecret, error) {
-	// 查询卡密
-	cardSecret, err := s.cardSecretRepo.GetBySecret(ctx, secret)
-	if err != nil {
-		return nil, fmt.Errorf("卡密不存在: %v", err)
-	}
-
-	// 检查卡密状态
-	if cardSecret.Status != 0 {
-		return nil, fmt.Errorf("卡密已被使用或锁定")
-	}
-
-	// 更新卡密状态
-	cardSecret.Status = 1
-	cardSecret.UsedAt = time.Now()
-	cardSecret.UsedBy = usedBy
-	cardSecret.OrderID = orderID
-
-	err = s.cardSecretRepo.Update(ctx, cardSecret)
-	if err != nil {
-		return nil, fmt.Errorf("使用卡密失败: %v", err)
-	}
-
-	return cardSecret, nil
-}
-
-// generateRandomSecret 生成随机卡密
-func (s *CardSecretServiceImpl) generateRandomSecret(length int) string {
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+// 生成随机卡密
+func generateRandomCode(length int) string {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	rand.Seed(time.Now().UnixNano())
 
-	var sb strings.Builder
-	sb.Grow(length)
-	for i := 0; i < length; i++ {
-		sb.WriteByte(charset[rand.Intn(len(charset))])
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
 	}
-	return sb.String()
+	return string(b)
 }

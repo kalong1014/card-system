@@ -2,33 +2,36 @@ package router
 
 import (
 	"card-system/backend/internal/controllers"
-	"card-system/backend/internal/middleware"
-	"card-system/backend/internal/repositories"
 	"card-system/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
 )
 
-func SetupRouter(r *gin.Engine, db *gorm.DB, redisClient *redis.Client) {
-	// 仓储实例
-	userRepo := repositories.NewUserRepository(db)
+func SetupRouter(userService services.UserService, cardService services.CardSecretService) *gin.Engine {
+	r := gin.Default()
 
-	// 服务实例
-	userService := services.NewUserService(userRepo)
+	// 创建控制器实例，直接使用接口类型
+	userController := controllers.NewUserController(userService)
+	cardController := controllers.NewCardSecretController(cardService)
 
-	// 控制器实例
-	userCtrl := controllers.NewUserController(userService)
-
-	// 路由分组
+	// 设置路由
 	api := r.Group("/api")
-	api.POST("/users/register", userCtrl.Register)
+	{
+		// 用户路由
+		users := api.Group("/users")
+		{
+			users.POST("/register", userController.Register)
+			// 其他用户路由...
+		}
 
-	// 应用中间件
-	r.Use(
-		middleware.Logger(),
-		middleware.Recovery(),
-		middleware.CORS(),
-	)
+		// 卡密路由
+		cards := api.Group("/cards")
+		{
+			cards.POST("/generate", cardController.GenerateCardSecrets)
+			cards.GET("/product/:product_id", cardController.GetCardSecretsByProduct)
+			// 其他卡密路由...
+		}
+	}
+
+	return r
 }
