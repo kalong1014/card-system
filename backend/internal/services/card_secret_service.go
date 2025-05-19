@@ -1,9 +1,9 @@
 package services
 
 import (
-	"card-system/internal/models"
-	"card-system/internal/repositories"
-	"card-system/pkg/logger"
+	"card-system/backend/internal/models"
+	"card-system/backend/internal/repositories"
+	"card-system/backend/pkg/logger"
 	"context"
 	"fmt"
 	"math/rand"
@@ -13,7 +13,7 @@ import (
 
 // CardSecretService 卡密服务接口
 type CardSecretService interface {
-	GenerateCardSecrets(ctx context.Context, productID, merchantID uint, count int, length int) ([]*models.CardSecret, error)
+	GenerateCardSecrets(ctx context.Context, productID, merchantID uint, count, length int) ([]*models.CardSecret, error)
 	GetCardSecretsByProduct(ctx context.Context, productID uint) ([]*models.CardSecret, error)
 	GetCardSecretByID(ctx context.Context, id uint) (*models.CardSecret, error)
 	UpdateCardSecret(ctx context.Context, cardSecret *models.CardSecret) error
@@ -63,10 +63,7 @@ func (s *CardSecretServiceImpl) GenerateCardSecrets(ctx context.Context, product
 	}
 
 	// 保存卡密
-	err = s.cardSecretRepo.CreateBatch(ctx, cardSecrets)
-	if err != nil {
-		logger.Errorf("批量创建卡密失败: %v", err)
-		return nil, fmt.Errorf("生成卡密失败: %v", err)
+	return cardSecrets, nil
 	}
 
 	// 更新商品库存
@@ -133,4 +130,4 @@ func (s *CardSecretServiceImpl) generateRandomSecret(length int) string {
 		sb.WriteByte(charset[rand.Intn(len(charset))])
 	}
 	return sb.String()
-}    
+}
