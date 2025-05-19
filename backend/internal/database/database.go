@@ -17,12 +17,13 @@ var (
 
 // InitDB 初始化数据库连接
 func InitDB() error {
+	// 替换为你的实际数据库配置
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		"your_username",
-		"your_password",
-		"your_host",
-		"your_port",
-		"your_dbname",
+		"root",        // 数据库用户名
+		"Aa123789@",   // 数据库密码
+		"localhost",   // 数据库主机
+		"3306",        // 数据库端口（通常MySQL是3306）
+		"card_system", // 数据库名称
 	)
 
 	var err error
@@ -33,7 +34,7 @@ func InitDB() error {
 	}
 
 	utils.Log.Info("Database connected successfully")
-	return nil // 添加缺失的返回语句
+	return nil
 }
 
 // InitRedis 初始化Redis连接
@@ -44,7 +45,6 @@ func InitRedis() error {
 		DB:       0,  // use default DB
 	})
 
-	// 修正：使用Redis包的上下文
 	ctx := context.Background()
 	_, err := Redis.Ping(ctx).Result()
 	if err != nil {

@@ -19,6 +19,9 @@ func NewUserController(service services.UserService) *UserController { // 改为
 // Register 用户注册
 func (c *UserController) Register(ctx *gin.Context) {
 	// 实现代码...
+
+	ctx.JSON(200, gin.H{
+		"message": "注册成功"})
 }
 
 // 其他方法...
