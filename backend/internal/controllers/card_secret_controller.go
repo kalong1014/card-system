@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"card-system/backend/internal/services"
+	"card-system/backend/pkg/response"
 	"net/http"
 	"strconv"
 
@@ -21,6 +22,7 @@ func NewCardSecretController(service services.CardSecretService) *CardSecretCont
 // GenerateCardSecrets 生成卡密
 func (c *CardSecretController) GenerateCardSecrets(ctx *gin.Context) {
 	// 实现代码...
+	response.SuccessWithMessage(ctx, "卡密生成成功")
 }
 
 // GetCardSecretsByProduct 根据产品ID获取卡密列表
@@ -29,17 +31,17 @@ func (c *CardSecretController) GetCardSecretsByProduct(ctx *gin.Context) {
 	productIDStr := ctx.Param("product_id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		response.Error(ctx, http.StatusBadRequest, "Invalid product ID")
 		return
 	}
 
 	// 调用服务层获取卡密列表
 	cardSecrets, err := c.cardService.GetCardSecretsByProduct(ctx, uint(productID))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get card secrets"})
+		response.Error(ctx, http.StatusInternalServerError, "Failed to get card secrets")
 		return
 	}
 
 	// 返回成功响应
-	ctx.JSON(http.StatusOK, gin.H{"data": cardSecrets})
+	response.Success(ctx, cardSecrets)
 }

@@ -11,7 +11,6 @@ import (
 type CardSecretRepository interface {
 	BatchCreate(ctx context.Context, cardSecrets []*models.CardSecret) error
 	GetByProduct(ctx context.Context, productID uint) ([]*models.CardSecret, error)
-	// 其他方法...
 }
 
 // CardSecretRepositoryImpl 卡密仓库实现

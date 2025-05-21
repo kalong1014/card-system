@@ -1,6 +1,7 @@
 package database
 
 import (
+	"card-system/backend/internal/config"
 	"card-system/backend/utils"
 	"context"
 	"fmt"
@@ -15,15 +16,14 @@ var (
 	Redis *redis.Client
 )
 
-// InitDB 初始化数据库连接
-func InitDB() error {
-	// 替换为你的实际数据库配置
+// InitDB 初始化数据库连接（接收 *config.Config 参数）
+func InitDB(cfg *config.Config) error {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		"root",        // 数据库用户名
-		"Aa123789@",   // 数据库密码
-		"localhost",   // 数据库主机
-		"3306",        // 数据库端口（通常MySQL是3306）
-		"card_system", // 数据库名称
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBName,
 	)
 
 	var err error
@@ -37,12 +37,12 @@ func InitDB() error {
 	return nil
 }
 
-// InitRedis 初始化Redis连接
-func InitRedis() error {
+// InitRedis 初始化 Redis 连接（接收 *config.Config 参数）
+func InitRedis(cfg *config.Config) error {
 	Redis = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Addr:     cfg.RedisHost + ":" + cfg.RedisPort,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
 	})
 
 	ctx := context.Background()

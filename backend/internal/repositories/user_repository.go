@@ -11,7 +11,7 @@ import (
 // UserRepository 定义用户仓库接口
 type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
-	// 其他接口方法...
+	Create(ctx context.Context, user *models.User) error
 }
 
 // UserRepositoryImpl 实现 UserRepository 接口
@@ -35,4 +35,9 @@ func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*mod
 		return nil, result.Error
 	}
 	return &user, nil
+}
+
+// Create 创建用户
+func (r *UserRepositoryImpl) Create(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Create(user).Error
 }

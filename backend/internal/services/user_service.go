@@ -8,8 +8,7 @@ import (
 
 // UserService 用户服务接口
 type UserService interface {
-	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
-	// 其他方法...
+	Register(ctx context.Context, user *models.User) error
 }
 
 // UserServiceImpl 用户服务实现
@@ -18,13 +17,11 @@ type UserServiceImpl struct {
 }
 
 // NewUserService 创建用户服务实例
-func NewUserService(repo repositories.UserRepository) UserService {
-	return &UserServiceImpl{userRepo: repo}
+func NewUserService(userRepo repositories.UserRepository) UserService {
+	return &UserServiceImpl{userRepo: userRepo}
 }
 
-// GetUserByEmail 根据邮箱获取用户
-func (s *UserServiceImpl) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
-	return s.userRepo.GetByEmail(ctx, email)
+// Register 用户注册
+func (s *UserServiceImpl) Register(ctx context.Context, user *models.User) error {
+	return s.userRepo.Create(ctx, user)
 }
-
-// 其他方法实现...
